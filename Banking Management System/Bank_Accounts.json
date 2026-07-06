@@ -1,0 +1,26 @@
+{
+    "1001": {
+        "name": "arpit",
+        "account_number": 1001,
+        "balance": 0,
+        "history": []
+    },
+    "1002": {
+        "name": "manan",
+        "account_number": 1002,
+        "balance": 0,
+        "history": []
+    },
+    "1003": {
+        "name": "krish",
+        "account_number": 1003,
+        "balance": 0,
+        "history": []
+    },
+    "1004": {
+        "name": "krishna",
+        "account_number": 1004,
+        "balance": 0,
+        "history": []
+    }
+}
