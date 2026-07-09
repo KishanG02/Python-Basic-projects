@@ -42,8 +42,10 @@ class ExpenseTracker:
 
 
     def delete_transaction(self, transaction_id):
-        transaction = self.find_transaction(transaction_id)
-        del transaction
+        success, result = self.find_transaction(transaction_id)
+        if not success:
+            return False, result
+        del self.transactions[transaction_id]
         return True, "Transaction deleted successfully."
 
     def find_transaction(self, transaction_id):
@@ -57,6 +59,25 @@ class ExpenseTracker:
             transaction.signed_amount
             for transaction in self.transactions.values()
         )
+
+    def overall_summary(self):
+        if not self.transactions:
+            return False, "No transactions found."
+
+        income = 0
+        expense = 0
+
+        for transaction in self.transactions.values():
+            if transaction.transaction_type == "income":
+                income += transaction.amount
+            else:
+                expense += transaction.amount
+
+        return True, {
+            "income": income,
+            "expense": expense,
+            "balance": income - expense,
+        }
 
     def monthly_summary(self, month, year):
         if not 1 <= month <= 12:
@@ -73,9 +94,9 @@ class ExpenseTracker:
                     expense += transaction.amount
     
         return True, {
-            "Income" : income,
-            "Expense" : expense,
-            "Net" : income - expense
+            "income": income,
+            "expense": expense,
+            "balance": income - expense,
         }
 
     def category_summary(self):
@@ -125,7 +146,7 @@ class ExpenseTracker:
     def load_transactions(self):
 
         try:
-            with open("transaction.csv", "r", newline="", encoding="utf-8") as f:
+            with open("transactions.csv", "r", newline="", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
                 self.transactions ={}
                 for row in reader:
@@ -136,6 +157,10 @@ class ExpenseTracker:
                 else:
                     self.next_transaction_id = 1
 
+        except FileNotFoundError:
+            self.transactions = {}
+            self.next_transaction_id = 1
+            return True, "No saved transactions found."
         except Exception as e:
             return False, str(e)
 
