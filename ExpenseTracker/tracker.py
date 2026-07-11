@@ -9,21 +9,23 @@ class ExpenseTracker:
         self.db = Database()
         self.next_transaction_id = self.db.get_next_transaction_id()
 
-    # --------------------------------------------------
+    # ==================================================
     # CRUD Operations
-    # --------------------------------------------------
+    # ==================================================
 
     def add_transaction(self, transaction_type, amount, category, description):
+
         try:
             transaction = Transaction(
                 self.next_transaction_id,
                 transaction_type,
                 amount,
                 category,
-                description,
+                description
             )
 
             self.db.insert_transaction(transaction)
+
             self.next_transaction_id += 1
 
             return True, transaction
@@ -72,32 +74,30 @@ class ExpenseTracker:
 
     def delete_transaction(self, transaction_id):
 
-        success, result = self.find_transaction(transaction_id)
+        success, transaction = self.find_transaction(transaction_id)
 
         if not success:
-            return False, result
+            return False, transaction
 
         self.db.delete_transaction(transaction_id)
 
         return True, "Transaction deleted successfully."
 
-    # --------------------------------------------------
+    # ==================================================
     # Properties
-    # --------------------------------------------------
+    # ==================================================
 
     @property
     def total_balance(self):
 
-        transactions = self.db.get_all_transactions()
-
-        return sum(
-            transaction.signed_amount
-            for transaction in transactions
+        return (
+            self.db.get_income()
+            - self.db.get_expense()
         )
 
-    # --------------------------------------------------
+    # ==================================================
     # Reports
-    # --------------------------------------------------
+    # ==================================================
 
     def overall_summary(self):
 
@@ -106,21 +106,14 @@ class ExpenseTracker:
         if not transactions:
             return False, "No transactions found."
 
-        income = 0
-        expense = 0
-
-        for transaction in transactions:
-
-            if transaction.transaction_type == "income":
-                income += transaction.amount
-            else:
-                expense += transaction.amount
+        income = self.db.get_income()
+        expense = self.db.get_expense()
 
         return True, {
             "income": income,
             "expense": expense,
             "balance": income - expense,
-            "transactions": len(transactions),
+            "transactions": len(transactions)
         }
 
     def monthly_summary(self, month, year):
@@ -148,12 +141,15 @@ class ExpenseTracker:
         return True, {
             "income": income,
             "expense": expense,
-            "balance": income - expense,
+            "balance": income - expense
         }
 
     def category_summary(self):
 
         transactions = self.db.get_all_transactions()
+
+        if not transactions:
+            return False, "No transactions found."
 
         summary = defaultdict(float)
 
@@ -177,22 +173,18 @@ class ExpenseTracker:
         if not expenses:
             return False, "No expense transactions found."
 
-        return True, max(
+        highest = max(
             expenses,
             key=lambda transaction: transaction.amount
         )
 
+        return True, highest
+
     def recent_transactions(self, limit=5):
 
-        transactions = self.db.get_all_transactions()
+        transactions = self.db.get_recent_transactions(limit)
 
         if not transactions:
             return False, "No transactions found."
 
-        transactions = sorted(
-            transactions,
-            key=lambda transaction: transaction.date,
-            reverse=True
-        )
-
-        return True, transactions[:limit]
+        return True, transactions
