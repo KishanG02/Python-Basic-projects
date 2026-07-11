@@ -1,38 +1,59 @@
 from collections import defaultdict
-import csv
-from datetime import datetime, date
+from database import Database
 from transaction import Transaction
+
 
 class ExpenseTracker:
 
     def __init__(self):
-        self.transactions = {}
-        self.next_transaction_id = 1
+        self.db = Database()
+        self.next_transaction_id = self.db.get_next_transaction_id()
+
+    # --------------------------------------------------
+    # CRUD Operations
+    # --------------------------------------------------
 
     def add_transaction(self, transaction_type, amount, category, description):
         try:
-            transaction = Transaction(self.next_transaction_id, transaction_type, amount, category, description)
-        except ValueError as e:
-            return False, str(e)
-        else:
-            self.transactions[self.next_transaction_id] = transaction
-            self.next_transaction_id += 1 
+            transaction = Transaction(
+                self.next_transaction_id,
+                transaction_type,
+                amount,
+                category,
+                description,
+            )
+
+            self.db.insert_transaction(transaction)
+            self.next_transaction_id += 1
+
             return True, transaction
 
-    def view_transactions(self, transaction_type = None, category = None):
-        if not self.transactions:
+        except ValueError as e:
+            return False, str(e)
+
+    def view_transactions(self, transaction_type=None, category=None):
+
+        transactions = self.db.get_all_transactions()
+
+        if not transactions:
             return False, "No transactions found."
 
-        category = category.title() if category else None
+        if transaction_type:
+            transaction_type = transaction_type.lower()
 
-        transaction_type = transaction_type.lower() if transaction_type else None
+        if category:
+            category = category.title()
 
         filtered = []
-        for transaction in self.transactions.values():
-            if category and transaction.category != category:
-                continue
+
+        for transaction in transactions:
+
             if transaction_type and transaction.transaction_type != transaction_type:
                 continue
+
+            if category and transaction.category != category:
+                continue
+
             filtered.append(transaction)
 
         if not filtered:
@@ -40,34 +61,56 @@ class ExpenseTracker:
 
         return True, filtered
 
+    def find_transaction(self, transaction_id):
+
+        transaction = self.db.get_transaction(transaction_id)
+
+        if transaction is None:
+            return False, "Transaction not found."
+
+        return True, transaction
 
     def delete_transaction(self, transaction_id):
+
         success, result = self.find_transaction(transaction_id)
+
         if not success:
             return False, result
-        del self.transactions[transaction_id]
+
+        self.db.delete_transaction(transaction_id)
+
         return True, "Transaction deleted successfully."
 
-    def find_transaction(self, transaction_id):
-        if transaction_id not in self.transactions:
-            return False, "No transaction found."
-        return True, self.transactions[transaction_id]
+    # --------------------------------------------------
+    # Properties
+    # --------------------------------------------------
 
     @property
     def total_balance(self):
+
+        transactions = self.db.get_all_transactions()
+
         return sum(
             transaction.signed_amount
-            for transaction in self.transactions.values()
+            for transaction in transactions
         )
 
+    # --------------------------------------------------
+    # Reports
+    # --------------------------------------------------
+
     def overall_summary(self):
-        if not self.transactions:
+
+        transactions = self.db.get_all_transactions()
+
+        if not transactions:
             return False, "No transactions found."
 
         income = 0
         expense = 0
 
-        for transaction in self.transactions.values():
+        for transaction in transactions:
+
             if transaction.transaction_type == "income":
                 income += transaction.amount
             else:
@@ -77,22 +120,31 @@ class ExpenseTracker:
             "income": income,
             "expense": expense,
             "balance": income - expense,
+            "transactions": len(transactions),
         }
 
     def monthly_summary(self, month, year):
+
         if not 1 <= month <= 12:
             return False, "Invalid month."
 
+        transactions = self.db.get_all_transactions()
+
         income = 0
         expense = 0
-        
-        for transaction in self.transactions.values():
-            if transaction.date.month == month and transaction.date.year == year:
-                if transaction.transaction_type == 'income':
+
+        for transaction in transactions:
+
+            if (
+                transaction.date.month == month
+                and transaction.date.year == year
+            ):
+
+                if transaction.transaction_type == "income":
                     income += transaction.amount
                 else:
                     expense += transaction.amount
-    
+
         return True, {
             "income": income,
             "expense": expense,
@@ -101,68 +153,46 @@ class ExpenseTracker:
 
     def category_summary(self):
 
+        transactions = self.db.get_all_transactions()
+
         summary = defaultdict(float)
 
-        for transaction in self.transactions.values():
-            if transaction.transaction_type == 'expense':
+        for transaction in transactions:
+
+            if transaction.transaction_type == "expense":
                 summary[transaction.category] += transaction.amount
 
         return True, dict(summary)
 
     def highest_expense(self):
 
-        filtered = []
-        for transaction in self.transactions.values():
-            if transaction.transaction_type == 'expense':
-                filtered.append(transaction)
-        
-        if not filtered:
-            return False, "No expense transactions found."
-        
-        return True, max(filtered, key=lambda transaction: transaction.amount)
+        transactions = self.db.get_all_transactions()
 
-    def recent_transactions(self, limit = 5):
-        if not self.transactions:
+        expenses = [
+            transaction
+            for transaction in transactions
+            if transaction.transaction_type == "expense"
+        ]
+
+        if not expenses:
+            return False, "No expense transactions found."
+
+        return True, max(
+            expenses,
+            key=lambda transaction: transaction.amount
+        )
+
+    def recent_transactions(self, limit=5):
+
+        transactions = self.db.get_all_transactions()
+
+        if not transactions:
             return False, "No transactions found."
 
-        last =  sorted(self.transactions.values(), key= lambda transaction: transaction.date, reverse= True)
+        transactions = sorted(
+            transactions,
+            key=lambda transaction: transaction.date,
+            reverse=True
+        )
 
-        return True, last[:limit]
-
-    def save_transactions(self):
-        try:
-            with open("transactions.csv", "w", newline="", encoding='utf-8') as f:
-                field_name = ['id', 'type', 'amount', 'category', 'description', 'date']
-                writer = csv.DictWriter(f, fieldnames= field_name)
-                writer.writeheader()
-
-                for transaction in self.transactions.values():
-                    writer.writerow(transaction.to_dict())
-        except OSError as e:
-            return False, str(e)
-
-        return True, "File Saved successfully."
-
-    def load_transactions(self):
-
-        try:
-            with open("transactions.csv", "r", newline="", encoding="utf-8") as f:
-                reader = csv.DictReader(f)
-                self.transactions ={}
-                for row in reader:
-                    transaction = Transaction.from_dict(row)
-                    self.transactions[transaction.transaction_id] = transaction
-                if self.transactions:
-                    self.next_transaction_id = max(self.transactions.keys())+1
-                else:
-                    self.next_transaction_id = 1
-
-        except FileNotFoundError:
-            self.transactions = {}
-            self.next_transaction_id = 1
-            return True, "No saved transactions found."
-        except Exception as e:
-            return False, str(e)
-
-        return True, "File Loaded successfully."
-
+        return True, transactions[:limit]
