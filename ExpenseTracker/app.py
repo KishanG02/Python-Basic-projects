@@ -1,19 +1,29 @@
 import streamlit as st
 from tracker import ExpenseTracker
 
-# -----------------------------
+# --------------------------------------------------
+# Page Config
+# --------------------------------------------------
+
+st.set_page_config(
+    page_title="Expense Tracker",
+    page_icon="💰",
+    layout="wide"
+)
+
+# --------------------------------------------------
 # Initialize Tracker
-# -----------------------------
+# --------------------------------------------------
+
 if "tracker" not in st.session_state:
-    tracker = ExpenseTracker()
-    tracker.load_transactions()
-    st.session_state.tracker = tracker
+    st.session_state.tracker = ExpenseTracker()
 
 tracker = st.session_state.tracker
 
-# -----------------------------
+# --------------------------------------------------
 # Sidebar
-# -----------------------------
+# --------------------------------------------------
+
 st.sidebar.title("💰 Expense Tracker")
 
 page = st.sidebar.radio(
@@ -23,13 +33,16 @@ page = st.sidebar.radio(
         "Add Income",
         "Add Expense",
         "Transactions",
-        "Reports"
+        "Reports",
+        "Delete Transaction",
+        "Find Transaction"
     ]
 )
 
-# -----------------------------
+# ==================================================
 # Dashboard
-# -----------------------------
+# ==================================================
+
 if page == "Dashboard":
 
     st.title("📊 Dashboard")
@@ -37,118 +50,141 @@ if page == "Dashboard":
     success, summary = tracker.overall_summary()
 
     if success:
-        col1, col2, col3 = st.columns(3)
 
-        col1.metric(
+        c1, c2, c3, c4 = st.columns(4)
+
+        c1.metric(
             "Income",
             f"₹{summary['income']:,.2f}"
         )
 
-        col2.metric(
+        c2.metric(
             "Expense",
             f"₹{summary['expense']:,.2f}"
         )
 
-        col3.metric(
+        c3.metric(
             "Balance",
             f"₹{summary['balance']:,.2f}"
         )
 
+        c4.metric(
+            "Transactions",
+            summary["transactions"]
+        )
+
+    else:
+        st.info(summary)
+
     st.divider()
+
+    st.subheader("Recent Transactions")
 
     success, transactions = tracker.recent_transactions()
 
     if success:
 
-        st.subheader("Recent Transactions")
-
         for transaction in transactions:
             st.text(transaction)
 
-# -----------------------------
+    else:
+        st.info(transactions)
+
+# ==================================================
 # Add Income
-# -----------------------------
+# ==================================================
+
 elif page == "Add Income":
 
     st.title("➕ Add Income")
 
-    amount = st.number_input(
-        "Amount",
-        min_value=0.0
-    )
+    with st.form("income_form"):
 
-    category = st.selectbox(
-        "Category",
-        [
-            "Salary",
-            "Investment",
-            "Other"
-        ]
-    )
-
-    description = st.text_input("Description")
-
-    if st.button("Add Income"):
-
-        success, message = tracker.add_transaction(
-            "income",
-            amount,
-            category,
-            description
+        amount = st.number_input(
+            "Amount",
+            min_value=0.01,
+            format="%.2f"
         )
 
-        if success:
-            tracker.save_transactions()
-            st.success("Income added successfully.")
-        else:
-            st.error(message)
+        category = st.selectbox(
+            "Category",
+            [
+                "Salary",
+                "Investment",
+                "Other"
+            ]
+        )
 
-# -----------------------------
+        description = st.text_input("Description")
+
+        submitted = st.form_submit_button("Add Income")
+
+        if submitted:
+
+            success, message = tracker.add_transaction(
+                "income",
+                amount,
+                category,
+                description
+            )
+
+            if success:
+                st.success("Income added successfully.")
+            else:
+                st.error(message)
+
+# ==================================================
 # Add Expense
-# -----------------------------
+# ==================================================
+
 elif page == "Add Expense":
 
     st.title("➖ Add Expense")
 
-    amount = st.number_input(
-        "Amount",
-        min_value=0.0
-    )
+    with st.form("expense_form"):
 
-    category = st.selectbox(
-        "Category",
-        [
-            "Food",
-            "Travel",
-            "Shopping",
-            "Bills",
-            "Entertainment",
-            "Healthcare",
-            "Education",
-            "Other"
-        ]
-    )
-
-    description = st.text_input("Description")
-
-    if st.button("Add Expense"):
-
-        success, message = tracker.add_transaction(
-            "expense",
-            amount,
-            category,
-            description
+        amount = st.number_input(
+            "Amount",
+            min_value=0.01,
+            format="%.2f"
         )
 
-        if success:
-            tracker.save_transactions()
-            st.success("Expense added successfully.")
-        else:
-            st.error(message)
+        category = st.selectbox(
+            "Category",
+            [
+                "Food",
+                "Travel",
+                "Shopping",
+                "Bills",
+                "Entertainment",
+                "Healthcare",
+                "Education",
+                "Other"
+            ]
+        )
 
-# -----------------------------
+        description = st.text_input("Description")
+
+        submitted = st.form_submit_button("Add Expense")
+
+        if submitted:
+
+            success, message = tracker.add_transaction(
+                "expense",
+                amount,
+                category,
+                description
+            )
+
+            if success:
+                st.success("Expense added successfully.")
+            else:
+                st.error(message)
+
+# ==================================================
 # Transactions
-# -----------------------------
+# ==================================================
+
 elif page == "Transactions":
 
     st.title("📋 Transactions")
@@ -165,58 +201,113 @@ elif page == "Transactions":
                 st.text(transaction)
 
     else:
-        st.info("No transactions found.")
+        st.info(transactions)
 
-# -----------------------------
+# ==================================================
 # Reports
-# -----------------------------
+# ==================================================
+
 elif page == "Reports":
 
     st.title("📈 Reports")
 
-    month = st.number_input(
+    col1, col2 = st.columns(2)
+
+    month = col1.number_input(
         "Month",
         min_value=1,
         max_value=12,
         value=1
     )
 
-    year = st.number_input(
+    year = col2.number_input(
         "Year",
-        min_value=2000,
+        min_value=2024,
+        max_value=2100,
         value=2026
     )
 
-    if st.button("Generate Monthly Report"):
+    if st.button("Generate Report"):
 
-        success, summary = tracker.monthly_summary(
-            month,
-            year
-        )
+        success, summary = tracker.monthly_summary(month, year)
 
         if success:
 
-            st.metric(
+            c1, c2, c3 = st.columns(3)
+
+            c1.metric(
                 "Income",
                 f"₹{summary['income']:,.2f}"
             )
 
-            st.metric(
+            c2.metric(
                 "Expense",
                 f"₹{summary['expense']:,.2f}"
             )
 
-            st.metric(
+            c3.metric(
                 "Balance",
                 f"₹{summary['balance']:,.2f}"
             )
 
+        else:
+            st.error(summary)
+
     st.divider()
+
+    st.subheader("Category Summary")
 
     success, categories = tracker.category_summary()
 
     if success:
 
-        st.subheader("Category Summary")
-
         st.bar_chart(categories)
+
+    else:
+        st.info(categories)
+
+# ==================================================
+# Delete Transaction
+# ==================================================
+
+elif page == "Delete Transaction":
+
+    st.title("🗑 Delete Transaction")
+
+    transaction_id = st.number_input(
+        "Transaction ID",
+        min_value=1,
+        step=1
+    )
+
+    if st.button("Delete"):
+
+        success, message = tracker.delete_transaction(transaction_id)
+
+        if success:
+            st.success(message)
+        else:
+            st.error(message)
+
+# ==================================================
+# Find Transaction
+# ==================================================
+
+elif page == "Find Transaction":
+
+    st.title("🔍 Find Transaction")
+
+    transaction_id = st.number_input(
+        "Transaction ID",
+        min_value=1,
+        step=1
+    )
+
+    if st.button("Search"):
+
+        success, transaction = tracker.find_transaction(transaction_id)
+
+        if success:
+            st.text(transaction)
+        else:
+            st.error(transaction)
