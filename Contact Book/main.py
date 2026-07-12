@@ -1,7 +1,7 @@
 import json
 
 def display_menu():
-    menu = """
+    display_menu = """
     =====================
         Contact Book
     =====================
@@ -14,7 +14,7 @@ def display_menu():
     7. Load Contacts
     8. Exit
     """
-    print(menu)
+    print(display_menu)
 
 def add_contact(contact_book):
     name = input("Enter name: ").strip()
